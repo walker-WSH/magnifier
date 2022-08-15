@@ -4,6 +4,9 @@
 #pragma comment(lib, "Magnification.lib")
 
 #define MAG_WINDOW_CLASS TEXT("MagnifierWindow")
+
+#define MSG_MAG_TASK WM_USER + 1
+
 #define MAG_TICK_TIMER 1000
 #define MAG_TICK_INTERVAL 40 // in ms
 
@@ -17,11 +20,9 @@ MagnifierCapture::~MagnifierCapture()
 	UnregisterClass(MAG_WINDOW_CLASS, GetModuleHandle(0));
 }
 
-void MagnifierCapture::Start(const RECT &rcScreen, std::vector<HWND> filter)
+void MagnifierCapture::Start()
 {
-	m_vIgnore = filter;
-	m_rcCaptureScreen = rcScreen;
-
+	assert(m_hMagThread == 0);
 	m_hExitEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
 }
@@ -33,14 +34,43 @@ void MagnifierCapture::Stop()
 	if (IsWindow(m_hHostWindow))
 		PostMessage(m_hHostWindow, WM_CLOSE, 0, 0);
 
-	SetEvent(m_hExitEvent);
-	WaitForSingleObject(m_hMagThread, INFINITE);
+	if (m_hExitEvent && m_hExitEvent != INVALID_HANDLE_VALUE)
+		SetEvent(m_hExitEvent);
 
-	CloseHandle(m_hMagThread);
-	CloseHandle(m_hExitEvent);
+	if (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE) {
+		WaitForSingleObject(m_hMagThread, INFINITE);
+		CloseHandle(m_hMagThread);
+	}
+
+	if (m_hExitEvent && m_hExitEvent != INVALID_HANDLE_VALUE)
+		CloseHandle(m_hExitEvent);
 
 	m_hMagThread = 0;
 	m_hExitEvent = 0;
+
+	m_hHostWindow = 0;
+	m_hMagChild = 0;
+}
+
+void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
+{
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	if (!self)
+		return;
+
+	PushTask([self, rcScreen]() { self->m_rcCaptureScreen = rcScreen; });
+}
+
+void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
+{
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	if (!self)
+		return;
+
+	PushTask([self, filter]() {
+		if (!filter.empty())
+			MagSetWindowFilterList(self->m_hMagChild, MW_FILTERMODE_EXCLUDE, (int)filter.size(), (HWND *)filter.data());
+	});
 }
 
 bool MagnifierCapture::RegisterMagClass()
@@ -89,7 +119,7 @@ void MagnifierCapture::MagnifierThreadInner()
 
 BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
-	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, MAG_WINDOW_CLASS, TEXT("Screen Magnifier Sample"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
+	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return FALSE;
 
@@ -109,8 +139,7 @@ BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 		return FALSE;
 	}
 
-	if (!m_vIgnore.empty())
-		MagSetWindowFilterList(m_hMagChild, MW_FILTERMODE_EXCLUDE, (int)m_vIgnore.size(), m_vIgnore.data());
+	RunTask();
 
 	if (DEBUG_MAG_WINDOW) {
 		MAGCOLOREFFECT magEffectInvert = {{// MagEffectInvert
@@ -126,17 +155,39 @@ BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 	return TRUE;
 }
 
-void MagnifierCapture::UpdateMagWindow()
+void MagnifierCapture::CaptureVideo()
 {
-	int cx = m_rcCaptureScreen.right - m_rcCaptureScreen.left;
-	int cy = m_rcCaptureScreen.bottom - m_rcCaptureScreen.top;
-	SetWindowPos(m_hHostWindow, NULL, m_rcCaptureScreen.left, m_rcCaptureScreen.top, cx, cy, 0);
+	SetWindowPos(m_hHostWindow, NULL, m_rcCaptureScreen.left, m_rcCaptureScreen.top, m_rcCaptureScreen.right - m_rcCaptureScreen.left, m_rcCaptureScreen.bottom - m_rcCaptureScreen.top, 0);
 
 	RECT rc;
 	GetClientRect(m_hHostWindow, &rc);
 	SetWindowPos(m_hMagChild, NULL, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, 0);
 
 	MagSetWindowSource(m_hMagChild, m_rcCaptureScreen);
+}
+
+void MagnifierCapture::PushTask(std::function<void()> func)
+{
+	{
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+		m_TaskList.push_back(func);
+	}
+
+	if (IsWindow(m_hHostWindow))
+		PostMessage(m_hHostWindow, MSG_MAG_TASK, 0, 0);
+}
+
+void MagnifierCapture::RunTask()
+{
+	std::vector<std::function<void()>> tasks;
+
+	{
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+		tasks.swap(m_TaskList);
+	}
+
+	for (auto &item : tasks)
+		item();
 }
 
 unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
@@ -155,18 +206,28 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 		SetTimer(hWnd, MAG_TICK_TIMER, MAG_TICK_INTERVAL, NULL);
 		break;
 
-	case WM_TIMER:
-		if (self && wParam == MAG_TICK_TIMER) {
-			self->UpdateMagWindow();
-			return 0;
-		}
-		break;
-
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
 
+	case WM_TIMER:
+		if (self && wParam == MAG_TICK_TIMER) {
+			self->CaptureVideo();
+			return 0;
+		}
+		break;
+
+	case MSG_MAG_TASK:
+		if (self) {
+			self->RunTask();
+			return 0;
+		}
+		break;
+
 	default:
+		if (self)
+			self->RunTask();
+
 		break;
 	}
 

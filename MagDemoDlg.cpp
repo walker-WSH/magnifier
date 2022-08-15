@@ -8,6 +8,11 @@
 #include "MagDemoDlg.h"
 #include "afxdialogex.h"
 
+#include "MagnifierCapture.h"
+
+std::shared_ptr<MagnifierCapture> cap(new MagnifierCapture);
+
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -43,9 +48,6 @@ END_MESSAGE_MAP()
 
 // CMagDemoDlg 对话框
 
-#include "MagnifierCapture.h"
-MagnifierCapture cap;
-
 static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, LPARAM param)
 {
 	RECT *rcMonitor = (RECT *)param;
@@ -62,9 +64,11 @@ static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, L
 
 CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIALOG, pParent)
 {
-	RECT m_rcCaptureScreen;
-	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)&m_rcCaptureScreen);
-	cap.Start(m_rcCaptureScreen, std::vector<HWND>());
+	RECT rc;
+	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)&rc);
+
+	cap->Start();
+	cap->SetCaptureRegion(rc);
 
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -78,6 +82,7 @@ BEGIN_MESSAGE_MAP(CMagDemoDlg, CDialogEx)
 ON_WM_SYSCOMMAND()
 ON_WM_PAINT()
 ON_WM_QUERYDRAGICON()
+ON_BN_CLICKED(IDOK, &CMagDemoDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
 
 // CMagDemoDlg 消息处理程序
@@ -155,4 +160,28 @@ void CMagDemoDlg::OnPaint()
 HCURSOR CMagDemoDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+static BOOL CALLBACK enum_monitor_props2(HMONITOR handle, HDC hdc, LPRECT rect, LPARAM param)
+{
+	RECT *rcMonitor = (RECT *)param;
+
+	MONITORINFO mi;
+	mi.cbSize = sizeof(mi);
+	GetMonitorInfo(handle, &mi);
+
+	if (mi.dwFlags == MONITORINFOF_PRIMARY)
+		*rcMonitor = mi.rcMonitor; // 保存副显示器的坐标
+
+	return TRUE;
+}
+
+void CMagDemoDlg::OnBnClickedOk()
+{
+	std::vector<HWND> fit{m_hWnd};
+	cap->SetExcludeWindow(fit);
+
+	RECT rc;
+	EnumDisplayMonitors(NULL, NULL, enum_monitor_props2, (LPARAM)&rc);
+	cap->SetCaptureRegion(rc);
 }
