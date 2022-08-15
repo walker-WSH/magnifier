@@ -17,7 +17,7 @@ HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex 
 
 	//present_begin(device, backbuffer);
 
-	//const HRESULT hr = RealPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
+	//const HRESULT hr = m_pRealPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
 
 	//present_end(device, backbuffer);
 
@@ -30,7 +30,7 @@ HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex 
 //	if (capture_active())
 //		d3d9_free();
 //
-//	return RealReset(device, params);
+//	return m_pRealReset(device, params);
 //}
 //
 //static HRESULT STDMETHODCALLTYPE hook_reset_ex(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params, D3DDISPLAYMODEEX *dmex)
@@ -38,7 +38,7 @@ HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex 
 //	if (capture_active())
 //		d3d9_free();
 //
-//	return RealResetEx(device, params, dmex);
+//	return m_pRealResetEx(device, params, dmex);
 //}
 
 MagnifierCore *MagnifierCore::Instance()
@@ -66,17 +66,17 @@ bool MagnifierCore::Init()
 	if (m_bInited)
 		return false;
 
-	RegisterMagClass();
+	RegisterTestClass();
 
-	RealPresentEx = (PresentEx_t)GetPresentExAddr();
-	if (!RealPresentEx) {
+	m_pRealPresentEx = (PresentEx_t)GetPresentExAddr();
+	if (!m_pRealPresentEx) {
 		assert(false);
 		return false;
 	}
 
 	DetourTransactionBegin();
 	DetourUpdateThread(GetCurrentThread());
-	DetourAttach((PVOID *)&RealPresentEx, PresentEx_Callback);
+	DetourAttach((PVOID *)&m_pRealPresentEx, PresentEx_Callback);
 	const LONG error = DetourTransactionCommit();
 	const bool success = (error == NO_ERROR);
 	if (!success) {
@@ -96,10 +96,10 @@ void MagnifierCore::Uninit()
 	if (!m_bInited)
 		return;
 
-	if (RealPresentEx) {
+	if (m_pRealPresentEx) {
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
-		DetourDetach((PVOID *)&RealPresentEx, PresentEx_Callback);
+		DetourDetach((PVOID *)&m_pRealPresentEx, PresentEx_Callback);
 		DetourTransactionCommit();
 	}
 
@@ -129,7 +129,7 @@ void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> ptr)
 	}
 }
 
-bool MagnifierCore ::RegisterMagClass()
+bool MagnifierCore ::RegisterTestClass()
 {
 	WNDCLASSEX wcex = {};
 	wcex.cbSize = sizeof(WNDCLASSEX);
@@ -153,14 +153,14 @@ void *MagnifierCore ::GetPresentExAddr()
 	IDirect3D9Ex *d3d9ex = nullptr;
 	IDirect3DDevice9Ex *d3d9Device = nullptr;
 
-	{ // TODO
-		if (d3d9Device)
-			d3d9Device->Release();
-		if (d3d9ex)
-			d3d9ex->Release();
-		if (hWnd)
-			DestroyWindow(hWnd);
-	}
+	//{ // TODO
+	//	if (d3d9Device)
+	//		d3d9Device->Release();
+	//	if (d3d9ex)
+	//		d3d9ex->Release();
+	//	if (hWnd)
+	//		DestroyWindow(hWnd);
+	//}
 
 	if (!m_hModule)
 		return nullptr;

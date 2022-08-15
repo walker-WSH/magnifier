@@ -24,16 +24,16 @@ protected:
 
 	MagnifierCore();
 
-	bool RegisterMagClass();
+	bool RegisterTestClass();
 	void *GetPresentExAddr();
 
 private:
 	bool m_bInited = false;
 
 	HMODULE m_hModule = 0; // need to free
-	PresentEx_t RealPresentEx = nullptr;
-	Reset_t RealReset = nullptr;
-	ResetEx_t RealResetEx = nullptr;
+	PresentEx_t m_pRealPresentEx = nullptr;
+	Reset_t m_pRealReset = nullptr;
+	ResetEx_t m_pRealResetEx = nullptr;
 
 	std::recursive_mutex m_lockList;
 	std::vector<std::shared_ptr<MagnifierCapture>> m_vMagList; // need to free
