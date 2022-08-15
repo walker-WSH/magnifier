@@ -2,7 +2,7 @@
 #include "MagnifierCore.h"
 #include <detours.h>
 
-#define DX9_WINDOW_CLASS TEXT("TestDX9ClassName")
+#define DX9_WINDOW_CLASS TEXT("DX9TestClassName")
 
 HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags)
 {
@@ -151,21 +151,21 @@ bool MagnifierCore ::RegisterTestClass()
 
 void *MagnifierCore ::GetPresentExAddr()
 {
+	if (!m_hModule)
+		return nullptr;
+
 	HWND hWnd = 0;
 	IDirect3D9Ex *d3d9ex = nullptr;
 	IDirect3DDevice9Ex *d3d9Device = nullptr;
 
-	//{ // TODO
-	//	if (d3d9Device)
-	//		d3d9Device->Release();
-	//	if (d3d9ex)
-	//		d3d9ex->Release();
-	//	if (hWnd)
-	//		DestroyWindow(hWnd);
-	//}
-
-	if (!m_hModule)
-		return nullptr;
+	RUN_WHEN_SECTION_END([=]() {
+		if (d3d9Device)
+			d3d9Device->Release();
+		if (d3d9ex)
+			d3d9ex->Release();
+		if (hWnd)
+			DestroyWindow(hWnd);
+	});
 
 	hWnd = CreateWindowEx(0, DX9_WINDOW_CLASS, TEXT("d3d9 offset"), WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
 	if (!hWnd)
