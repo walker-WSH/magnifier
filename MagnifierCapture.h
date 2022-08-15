@@ -22,7 +22,7 @@ public:
 	void SetExcludeWindow(std::vector<HWND> filter);
 	void SetCaptureRegion(RECT rcScreen);
 
-private:
+protected:
 	static LRESULT __stdcall HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	static unsigned __stdcall MagnifierThread(void *pParam);
 	bool RegisterMagClass();
