@@ -17,37 +17,32 @@ MagnifierCapture::MagnifierCapture()
 
 MagnifierCapture::~MagnifierCapture()
 {
+	assert(!IsWindow(m_hHostWindow));
 	UnregisterClass(MAG_WINDOW_CLASS, GetModuleHandle(0));
 }
 
 void MagnifierCapture::Start()
 {
 	assert(m_hMagThread == 0);
-	m_hExitEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
 }
 
 void MagnifierCapture::Stop()
 {
-	// TODO: Wait init done
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	assert(self);
 
-	if (IsWindow(m_hHostWindow))
-		PostMessage(m_hHostWindow, WM_CLOSE, 0, 0);
-
-	if (m_hExitEvent && m_hExitEvent != INVALID_HANDLE_VALUE)
-		SetEvent(m_hExitEvent);
+	PushTask([self]() {
+		if (IsWindow(self->m_hHostWindow))
+			DestroyWindow(self->m_hHostWindow);
+	});
 
 	if (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE) {
 		WaitForSingleObject(m_hMagThread, INFINITE);
 		CloseHandle(m_hMagThread);
 	}
 
-	if (m_hExitEvent && m_hExitEvent != INVALID_HANDLE_VALUE)
-		CloseHandle(m_hExitEvent);
-
 	m_hMagThread = 0;
-	m_hExitEvent = 0;
-
 	m_hHostWindow = 0;
 	m_hMagChild = 0;
 }
@@ -55,6 +50,7 @@ void MagnifierCapture::Stop()
 void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
 {
 	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	assert(self);
 	if (!self)
 		return;
 
@@ -64,6 +60,7 @@ void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
 void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
 {
 	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	assert(self);
 	if (!self)
 		return;
 
@@ -108,6 +105,8 @@ void MagnifierCapture::MagnifierThreadInner()
 	ShowWindow(m_hHostWindow, SW_SHOW);
 	UpdateWindow(m_hHostWindow);
 
+	RunTask();
+
 	MSG msg;
 	while (GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
@@ -117,11 +116,11 @@ void MagnifierCapture::MagnifierThreadInner()
 	MagUninitialize();
 }
 
-BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
+bool MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
 	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
-		return FALSE;
+		return false;
 
 	SetWindowLongPtr(m_hHostWindow, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 	if (DEBUG_MAG_WINDOW)
@@ -136,10 +135,8 @@ BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 	if (!m_hMagChild) {
 		DestroyWindow(m_hHostWindow);
 		m_hHostWindow = 0;
-		return FALSE;
+		return false;
 	}
-
-	RunTask();
 
 	if (DEBUG_MAG_WINDOW) {
 		MAGCOLOREFFECT magEffectInvert = {{// MagEffectInvert
@@ -152,7 +149,7 @@ BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 		MagSetColorEffect(m_hMagChild, &magEffectInvert);
 	}
 
-	return TRUE;
+	return true;
 }
 
 void MagnifierCapture::CaptureVideo()

@@ -27,15 +27,12 @@ private:
 	static unsigned __stdcall MagnifierThread(void *pParam);
 	bool RegisterMagClass();
 	void MagnifierThreadInner();
-	BOOL SetupMagnifier(HINSTANCE hInst);
+	bool SetupMagnifier(HINSTANCE hInst);
 	void CaptureVideo();
 	void PushTask(std::function<void()> func);
 	void RunTask();
 
 private:
-	HANDLE m_hExitEvent = 0;
-	HANDLE m_hMagThread = 0;
-
 	std::recursive_mutex m_lockList;
 	std::vector<std::function<void()>> m_TaskList;
 
@@ -43,6 +40,7 @@ private:
 	std::vector<HWND> m_vIgnore;
 	RECT m_rcCaptureScreen = {0};
 
+	HANDLE m_hMagThread = 0;
 	HWND m_hHostWindow = 0;
 	HWND m_hMagChild = 0;
 };

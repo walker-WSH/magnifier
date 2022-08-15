@@ -178,6 +178,9 @@ static BOOL CALLBACK enum_monitor_props2(HMONITOR handle, HDC hdc, LPRECT rect, 
 
 void CMagDemoDlg::OnBnClickedOk()
 {
+	cap->Stop();
+	return;
+
 	std::vector<HWND> fit{m_hWnd};
 	cap->SetExcludeWindow(fit);
 
