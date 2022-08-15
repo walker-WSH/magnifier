@@ -191,6 +191,7 @@ unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
 {
 	MagnifierCapture *self = reinterpret_cast<MagnifierCapture *>(pParam);
 	self->MagnifierThreadInner();
+	self->RunTask();
 	return 0;
 }
 
@@ -215,12 +216,6 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 		break;
 
 	case MSG_MAG_TASK:
-		if (self) {
-			self->RunTask();
-			return 0;
-		}
-		break;
-
 	default:
 		if (self)
 			self->RunTask();
