@@ -32,6 +32,10 @@ void MagnifierCapture::Stop()
 	std::shared_ptr<MagnifierCapture> self = shared_from_this();
 	assert(self);
 
+	bool bMagRunning = (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE);
+	if (!bMagRunning)
+		return;
+
 	PushTask([self, this]() {
 		if (IsWindow(m_hHostWindow))
 			DestroyWindow(m_hHostWindow);
@@ -40,11 +44,9 @@ void MagnifierCapture::Stop()
 		m_hMagChild = 0;
 	});
 
-	if (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE) {
-		WaitForSingleObject(m_hMagThread, INFINITE);
-		CloseHandle(m_hMagThread);
-		m_hMagThread = 0;
-	}
+	WaitForSingleObject(m_hMagThread, INFINITE);
+	CloseHandle(m_hMagThread);
+	m_hMagThread = 0;
 }
 
 void MagnifierCapture::SetCaptureRegion(RECT rcScreen)

@@ -119,6 +119,8 @@ std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 
 void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> ptr)
 {
+	ptr->Stop();
+
 	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
 	auto itr = m_vMagList.begin();
 	while (itr != m_vMagList.end()) {
