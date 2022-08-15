@@ -12,11 +12,9 @@
 #define new DEBUG_NEW
 #endif
 
-
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
-class CAboutDlg : public CDialogEx
-{
+class CAboutDlg : public CDialogEx {
 public:
 	CAboutDlg();
 
@@ -25,19 +23,17 @@ public:
 	enum { IDD = IDD_ABOUTBOX };
 #endif
 
-	protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
+protected:
+	virtual void DoDataExchange(CDataExchange *pDX); // DDX/DDV 支持
 
-// 实现
+	// 实现
 protected:
 	DECLARE_MESSAGE_MAP()
 };
 
-CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
-{
-}
+CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX) {}
 
-void CAboutDlg::DoDataExchange(CDataExchange* pDX)
+void CAboutDlg::DoDataExchange(CDataExchange *pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 }
@@ -45,36 +41,44 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
 END_MESSAGE_MAP()
 
-
 // CMagDemoDlg 对话框
 
 #include "MagnifierCapture.h"
 MagnifierCapture cap;
 
-CMagDemoDlg::CMagDemoDlg(CWnd* pParent /*=nullptr*/)
-	: CDialogEx(IDD_MAGDEMO_DIALOG, pParent)
+static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, LPARAM param)
+{
+	RECT *rcMonitor = (RECT *)param;
+
+	MONITORINFO mi;
+	mi.cbSize = sizeof(mi);
+	GetMonitorInfo(handle, &mi);
+
+	if (mi.dwFlags != MONITORINFOF_PRIMARY)
+		*rcMonitor = mi.rcMonitor; // 保存副显示器的坐标
+
+	return TRUE;
+}
+
+CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIALOG, pParent)
 {
 	RECT m_rcCaptureScreen;
-	m_rcCaptureScreen.left = 0;
-	m_rcCaptureScreen.top = 0;
-	m_rcCaptureScreen.right = 0 + 3480;
-	m_rcCaptureScreen.bottom = 0 + 2460;
+	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)&m_rcCaptureScreen);
 	cap.Start(m_rcCaptureScreen, std::vector<HWND>());
 
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
-void CMagDemoDlg::DoDataExchange(CDataExchange* pDX)
+void CMagDemoDlg::DoDataExchange(CDataExchange *pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 }
 
 BEGIN_MESSAGE_MAP(CMagDemoDlg, CDialogEx)
-	ON_WM_SYSCOMMAND()
-	ON_WM_PAINT()
-	ON_WM_QUERYDRAGICON()
+ON_WM_SYSCOMMAND()
+ON_WM_PAINT()
+ON_WM_QUERYDRAGICON()
 END_MESSAGE_MAP()
-
 
 // CMagDemoDlg 消息处理程序
 
@@ -88,15 +92,13 @@ BOOL CMagDemoDlg::OnInitDialog()
 	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
 	ASSERT(IDM_ABOUTBOX < 0xF000);
 
-	CMenu* pSysMenu = GetSystemMenu(FALSE);
-	if (pSysMenu != nullptr)
-	{
+	CMenu *pSysMenu = GetSystemMenu(FALSE);
+	if (pSysMenu != nullptr) {
 		BOOL bNameValid;
 		CString strAboutMenu;
 		bNameValid = strAboutMenu.LoadString(IDS_ABOUTBOX);
 		ASSERT(bNameValid);
-		if (!strAboutMenu.IsEmpty())
-		{
+		if (!strAboutMenu.IsEmpty()) {
 			pSysMenu->AppendMenu(MF_SEPARATOR);
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
@@ -104,23 +106,20 @@ BOOL CMagDemoDlg::OnInitDialog()
 
 	// 设置此对话框的图标。  当应用程序主窗口不是对话框时，框架将自动
 	//  执行此操作
-	SetIcon(m_hIcon, TRUE);			// 设置大图标
-	SetIcon(m_hIcon, FALSE);		// 设置小图标
+	SetIcon(m_hIcon, TRUE);  // 设置大图标
+	SetIcon(m_hIcon, FALSE); // 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
 
-	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+	return TRUE; // 除非将焦点设置到控件，否则返回 TRUE
 }
 
 void CMagDemoDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
-	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
-	{
+	if ((nID & 0xFFF0) == IDM_ABOUTBOX) {
 		CAboutDlg dlgAbout;
 		dlgAbout.DoModal();
-	}
-	else
-	{
+	} else {
 		CDialogEx::OnSysCommand(nID, lParam);
 	}
 }
@@ -131,8 +130,7 @@ void CMagDemoDlg::OnSysCommand(UINT nID, LPARAM lParam)
 
 void CMagDemoDlg::OnPaint()
 {
-	if (IsIconic())
-	{
+	if (IsIconic()) {
 		CPaintDC dc(this); // 用于绘制的设备上下文
 
 		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
@@ -147,9 +145,7 @@ void CMagDemoDlg::OnPaint()
 
 		// 绘制图标
 		dc.DrawIcon(x, y, m_hIcon);
-	}
-	else
-	{
+	} else {
 		CDialogEx::OnPaint();
 	}
 }
@@ -160,4 +156,3 @@ HCURSOR CMagDemoDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
 }
-

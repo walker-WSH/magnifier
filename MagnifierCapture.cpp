@@ -17,7 +17,7 @@ MagnifierCapture::~MagnifierCapture()
 	UnregisterClass(MAG_WINDOW_CLASS, GetModuleHandle(0));
 }
 
-void MagnifierCapture::Start(RECT rcScreen, std::vector<HWND> filter)
+void MagnifierCapture::Start(const RECT &rcScreen, std::vector<HWND> filter)
 {
 	m_vIgnore = filter;
 	m_rcCaptureScreen = rcScreen;
@@ -89,8 +89,7 @@ void MagnifierCapture::MagnifierThreadInner()
 
 BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
-	DWORD dwStyle = WS_SIZEBOX | WS_CLIPCHILDREN | WS_MAXIMIZEBOX;
-	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, MAG_WINDOW_CLASS, TEXT("Screen Magnifier Sample"), dwStyle, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
+	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, MAG_WINDOW_CLASS, TEXT("Screen Magnifier Sample"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return FALSE;
 

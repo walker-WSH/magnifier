@@ -13,7 +13,7 @@ public:
 	MagnifierCapture();
 	~MagnifierCapture();
 
-	void Start(RECT rcScreen, std::vector<HWND> filter);
+	void Start(const RECT &rcScreen, std::vector<HWND> filter);
 	void Stop();
 
 private:
