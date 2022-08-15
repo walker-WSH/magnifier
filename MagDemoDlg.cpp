@@ -10,8 +10,6 @@
 
 #include "MagnifierCapture.h"
 
-std::shared_ptr<MagnifierCapture> cap(new MagnifierCapture);
-
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -62,13 +60,20 @@ static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, L
 	return TRUE;
 }
 
+std::shared_ptr<MagnifierCapture> cap1(new MagnifierCapture);
+std::shared_ptr<MagnifierCapture> cap2(new MagnifierCapture);
+
 CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIALOG, pParent)
 {
 	RECT rc;
 	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)&rc);
 
-	cap->Start();
-	cap->SetCaptureRegion(rc);
+	std::vector<HWND> fit{m_hWnd};
+	cap1->SetExcludeWindow(fit);
+
+	cap1->SetCaptureRegion(rc);
+	
+	cap1->Start();
 
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -178,13 +183,6 @@ static BOOL CALLBACK enum_monitor_props2(HMONITOR handle, HDC hdc, LPRECT rect, 
 
 void CMagDemoDlg::OnBnClickedOk()
 {
-	cap->Stop();
+	cap1->Stop();
 	return;
-
-	std::vector<HWND> fit{m_hWnd};
-	cap->SetExcludeWindow(fit);
-
-	RECT rc;
-	EnumDisplayMonitors(NULL, NULL, enum_monitor_props2, (LPARAM)&rc);
-	cap->SetCaptureRegion(rc);
 }
