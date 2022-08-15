@@ -119,7 +119,7 @@ void MagnifierCapture::MagnifierThreadInner()
 
 BOOL MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
-	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
+	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return FALSE;
 
