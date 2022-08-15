@@ -167,7 +167,7 @@ void MagnifierCapture::PushTask(std::function<void()> func)
 {
 	{
 		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
-		m_TaskList.push_back(func);
+		m_vTaskList.push_back(func);
 	}
 
 	if (IsWindow(m_hHostWindow))
@@ -180,7 +180,7 @@ void MagnifierCapture::RunTask()
 
 	{
 		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
-		tasks.swap(m_TaskList);
+		tasks.swap(m_vTaskList);
 	}
 
 	for (auto &item : tasks)

@@ -34,10 +34,9 @@ private:
 
 private:
 	std::recursive_mutex m_lockList;
-	std::vector<std::function<void()>> m_TaskList;
+	std::vector<std::function<void()>> m_vTaskList;
 
-	// Access them in magnifier thread
-	std::vector<HWND> m_vIgnore;
+	// Accessed in magnifier thread
 	RECT m_rcCaptureScreen = {0};
 
 	HANDLE m_hMagThread = 0;
