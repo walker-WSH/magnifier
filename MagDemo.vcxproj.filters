@@ -39,6 +39,9 @@
     <ClInclude Include="MagnifierCapture.h">
       <Filter>mag</Filter>
     </ClInclude>
+    <ClInclude Include="MagnifierCore.h">
+      <Filter>mag</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MagDemo.cpp">
@@ -51,6 +54,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="MagnifierCapture.cpp">
+      <Filter>mag</Filter>
+    </ClCompile>
+    <ClCompile Include="MagnifierCore.cpp">
       <Filter>mag</Filter>
     </ClCompile>
   </ItemGroup>

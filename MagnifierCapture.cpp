@@ -154,7 +154,12 @@ bool MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 
 void MagnifierCapture::CaptureVideo()
 {
-	SetWindowPos(m_hHostWindow, NULL, m_rcCaptureScreen.left, m_rcCaptureScreen.top, m_rcCaptureScreen.right - m_rcCaptureScreen.left, m_rcCaptureScreen.bottom - m_rcCaptureScreen.top, 0);
+	LONG cx = m_rcCaptureScreen.right - m_rcCaptureScreen.left;
+	LONG cy = m_rcCaptureScreen.bottom - m_rcCaptureScreen.top;
+	if (!cx || !cy)
+		return;
+
+	SetWindowPos(m_hHostWindow, NULL, m_rcCaptureScreen.left, m_rcCaptureScreen.top, cx, cy, 0);
 
 	RECT rc;
 	GetClientRect(m_hHostWindow, &rc);

@@ -12,8 +12,9 @@
 #define DEBUG_MAG_WINDOW 0
 
 class MagnifierCapture : public std::enable_shared_from_this<MagnifierCapture> {
+	friend class MagnifierCore;
+
 public:
-	MagnifierCapture();
 	~MagnifierCapture();
 
 	void Start();
@@ -25,6 +26,9 @@ public:
 protected:
 	static LRESULT __stdcall HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	static unsigned __stdcall MagnifierThread(void *pParam);
+	
+	MagnifierCapture();
+
 	bool RegisterMagClass();
 	void MagnifierThreadInner();
 	bool SetupMagnifier(HINSTANCE hInst);
