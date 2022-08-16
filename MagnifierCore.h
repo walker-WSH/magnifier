@@ -49,7 +49,6 @@ private:
 	ResetEx_t m_pRealResetEx = nullptr;
 	bool m_bResetHooked = false;
 
-
 	std::recursive_mutex m_lockList;
 	std::map<DWORD, std::shared_ptr<MagnifierCapture>> m_mapMagList; // need to free
 };

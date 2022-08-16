@@ -53,7 +53,7 @@ protected:
 	bool CreateCopySurface(IDirect3DDevice9Ex *device);
 
 private:
-	std::recursive_mutex m_lockList;
+	std::recursive_mutex m_lockTask;
 	std::vector<std::function<void()>> m_vTaskList;
 
 	// Accessed in magnifier thread
@@ -69,5 +69,5 @@ private:
 	D3DFORMAT m_D3DFormat = D3DFMT_UNKNOWN;
 	UINT m_uWidth = 0;
 	UINT m_uHeight = 0;
-	int m_nSurfacePitch = 0;
+	INT m_nSurfacePitch = 0;
 };

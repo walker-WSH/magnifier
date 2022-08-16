@@ -225,7 +225,7 @@ void MagnifierCapture::CaptureVideo()
 void MagnifierCapture::PushTask(std::function<void()> func)
 {
 	{
-		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockTask);
 		m_vTaskList.push_back(func);
 	}
 
@@ -238,7 +238,7 @@ void MagnifierCapture::RunTask()
 	std::vector<std::function<void()>> tasks;
 
 	{
-		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockTask);
 		tasks.swap(m_vTaskList);
 	}
 
