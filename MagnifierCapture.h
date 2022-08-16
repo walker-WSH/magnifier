@@ -8,8 +8,16 @@
 #include <magnification.h>
 #include <functional>
 #include <assert.h>
+#include <d3d9.h>
+#include <detours.h>
+#include "ComPtr.hpp"
 
 #define DEBUG_MAG_WINDOW 0
+
+using Direct3DCreate9Ex_t = HRESULT(WINAPI *)(UINT, IDirect3D9Ex **);
+using PresentEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9Ex *, CONST RECT *, CONST RECT *, HWND, CONST RGNDATA *, DWORD);
+using Reset_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *);
+using ResetEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *, D3DDISPLAYMODEEX *);
 
 class MagnifierCapture : public std::enable_shared_from_this<MagnifierCapture> {
 	friend class MagnifierCore;
@@ -23,18 +31,27 @@ public:
 protected:
 	static LRESULT __stdcall HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	static unsigned __stdcall MagnifierThread(void *pParam);
-	
+
+	void MagnifierThreadInner();
+	bool SetupMagnifier(HINSTANCE hInst);
+	void CaptureVideo();
+
 	MagnifierCapture();
+	bool RegisterMagClass();
 
 	DWORD Start();
 	void Stop();
 
-	bool RegisterMagClass();
-	void MagnifierThreadInner();
-	bool SetupMagnifier(HINSTANCE hInst);
-	void CaptureVideo();
 	void PushTask(std::function<void()> func);
 	void RunTask();
+
+	bool OnPresentEx(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags);
+	void FreeDX();
+
+	bool InitDX9(IDirect3DDevice9Ex *device);
+	bool CaptureDX9();
+	bool InitTextureInfo(IDirect3DDevice9Ex *device);
+	bool CreateCopySurface(IDirect3DDevice9Ex *device);
 
 private:
 	std::recursive_mutex m_lockList;
@@ -47,4 +64,11 @@ private:
 	HANDLE m_hMagThread = 0;
 	HWND m_hHostWindow = 0;
 	HWND m_hMagChild = 0;
+
+	IDirect3DDevice9Ex *m_pDeviceEx = nullptr; /* do not release */
+	ComPtr<IDirect3DSurface9> m_pSurface;
+	D3DFORMAT m_D3DFormat;
+	UINT m_uWidth;
+	UINT m_uHeight;
+	int m_nSurfacePitch = 0;
 };

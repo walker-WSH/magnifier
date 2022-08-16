@@ -76,6 +76,7 @@ CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIA
 	std::vector<HWND> fit{m_hWnd};
 	cap1->SetExcludeWindow(fit);
 	cap1->SetCaptureRegion(rc);
+	cap2->SetCaptureRegion(rc);
 	
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -186,5 +187,4 @@ static BOOL CALLBACK enum_monitor_props2(HMONITOR handle, HDC hdc, LPRECT rect, 
 void CMagDemoDlg::OnBnClickedOk()
 {
 	MagnifierCore::Instance()->DestroyMagnifier(cap1);
-	return;
 }

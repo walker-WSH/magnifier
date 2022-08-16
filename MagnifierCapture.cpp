@@ -1,14 +1,13 @@
 #include "pch.h"
 #include "MagnifierCapture.h"
+#include "MagnifierCore.h"
 
 #pragma comment(lib, "Magnification.lib")
 
 #define MAG_WINDOW_CLASS TEXT("MagnifierWindow")
-
 #define MSG_MAG_TASK WM_USER + 1
-
-#define MAG_TICK_TIMER 1000
-#define MAG_TICK_INTERVAL 40 // in ms
+#define MAG_TICK_TIMER_ID 1000
+#define MAG_TICK_INTERVAL 50 // in ms
 
 unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
 {
@@ -24,7 +23,7 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 
 	switch (message)
 	case WM_CREATE: {
-		SetTimer(hWnd, MAG_TICK_TIMER, MAG_TICK_INTERVAL, NULL);
+		SetTimer(hWnd, MAG_TICK_TIMER_ID, MAG_TICK_INTERVAL, NULL);
 		break;
 
 	case WM_DESTROY:
@@ -32,7 +31,7 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 		return 0;
 
 	case WM_TIMER:
-		if (self && wParam == MAG_TICK_TIMER) {
+		if (self && wParam == MAG_TICK_TIMER_ID) {
 			self->CaptureVideo();
 			return 0;
 		}
@@ -171,7 +170,13 @@ void MagnifierCapture::MagnifierThreadInner()
 
 bool MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
-	m_hHostWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
+	DWORD dwStyle = WS_POPUP | WS_CLIPCHILDREN;
+#ifdef DEBUG
+	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED;
+#else
+	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW;
+#endif
+	m_hHostWindow = CreateWindowEx(dwExStyle, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), dwStyle, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return false;
 
@@ -243,4 +248,137 @@ void MagnifierCapture::RunTask()
 
 	for (auto &item : tasks)
 		item();
+}
+
+static inline HRESULT get_backbuffer(IDirect3DDevice9 *device, IDirect3DSurface9 **surface)
+{
+	static bool use_backbuffer = false;
+	static bool checked_exceptions = false;
+
+	//if (!checked_exceptions) {
+	//	if (_strcmpi(get_process_name(), "hotd_ng.exe") == 0)
+	//		use_backbuffer = true;
+	//	checked_exceptions = true;
+	//}
+
+	if (use_backbuffer) {
+		return device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, surface);
+	} else {
+		return device->GetRenderTarget(0, surface);
+	}
+}
+
+bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags)
+{
+	assert(GetCurrentThreadId() == m_dwThreadID);
+
+	if (m_pDeviceEx != device)
+		FreeDX();
+
+	if (!m_pDeviceEx)
+		InitDX9(device);
+
+	if (!m_pDeviceEx)
+		return false; // never inited
+
+	return CaptureDX9();
+}
+
+void MagnifierCapture::FreeDX()
+{
+	assert(GetCurrentThreadId() == m_dwThreadID);
+	m_pDeviceEx = nullptr;
+	m_pSurface = nullptr;
+	m_D3DFormat = D3DFMT_UNKNOWN;
+	m_uWidth = 0;
+	m_uHeight = 0;
+	m_nSurfacePitch = 0;
+}
+
+bool MagnifierCapture::InitTextureInfo(IDirect3DDevice9Ex *device)
+{
+	ComPtr<IDirect3DSwapChain9> swap;
+	HRESULT hr = device->GetSwapChain(0, &swap);
+	if (FAILED(hr))
+		return false;
+
+	D3DPRESENT_PARAMETERS pp;
+	hr = swap->GetPresentParameters(&pp);
+	if (FAILED(hr))
+		return false;
+
+	m_D3DFormat = pp.BackBufferFormat;
+	m_uWidth = pp.BackBufferWidth;
+	m_uHeight = pp.BackBufferHeight;
+
+	ComPtr<IDirect3DSurface9> bkBuffer;
+	hr = device->GetRenderTarget(0, &bkBuffer);
+	if (SUCCEEDED(hr)) {
+		D3DSURFACE_DESC desc;
+		hr = bkBuffer->GetDesc(&desc);
+		if (SUCCEEDED(hr)) {
+			m_D3DFormat = desc.Format;
+			m_uWidth = desc.Width;
+			m_uHeight = desc.Height;
+		}
+	}
+
+	return true;
+}
+
+bool MagnifierCapture::CreateCopySurface(IDirect3DDevice9Ex *device)
+{
+	HRESULT hr = device->CreateOffscreenPlainSurface(m_uWidth, m_uHeight, m_D3DFormat, D3DPOOL_SYSTEMMEM, &m_pSurface, nullptr);
+	if (FAILED(hr))
+		return false;
+
+	D3DLOCKED_RECT rect;
+	hr = m_pSurface->LockRect(&rect, nullptr, D3DLOCK_READONLY);
+	if (FAILED(hr))
+		return false;
+
+	m_nSurfacePitch = rect.Pitch;
+	m_pSurface->UnlockRect();
+
+	return true;
+}
+
+bool MagnifierCapture::InitDX9(IDirect3DDevice9Ex *device)
+{
+	if (!InitTextureInfo(device)) {
+		FreeDX();
+		return false;
+	}
+
+	if (!CreateCopySurface(device)) {
+		FreeDX();
+		return false;
+	}
+
+	m_pDeviceEx = device;
+	return true;
+}
+
+bool MagnifierCapture::CaptureDX9()
+{
+	assert(m_pDeviceEx);
+
+	ComPtr<IDirect3DSurface9> backbuffer;
+	HRESULT hr = m_pDeviceEx->GetRenderTarget(0, backbuffer.Assign());
+	if (FAILED(hr))
+		return false;
+
+	hr = m_pDeviceEx->GetRenderTargetData(backbuffer, m_pSurface);
+	if (FAILED(hr))
+		return false;
+
+	D3DLOCKED_RECT rect;
+	hr = m_pSurface->LockRect(&rect, nullptr, D3DLOCK_READONLY);
+	if (FAILED(hr))
+		return false;
+
+	// TODO shmem_copy_data(i, rect.pBits);
+	m_pSurface->UnlockRect();
+
+	return true;
 }

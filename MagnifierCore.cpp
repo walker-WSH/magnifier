@@ -1,45 +1,41 @@
 #include "pch.h"
 #include "MagnifierCore.h"
-#include <detours.h>
+#include "ComPtr.hpp"
 
 #define DX9_WINDOW_CLASS TEXT("DX9TestClassName")
 
 HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags)
 {
-	// TODO
+#ifdef DEBUG
+	char buf[MAX_PATH];
+	snprintf(buf, MAX_PATH, "callback of PresentEx, TID: %u , Time: %u \n", GetCurrentThreadId(), GetTickCount());
+	OutputDebugStringA(buf);
+#endif
 
-	OutputDebugStringA("PresentEx_Callback ================ \n");
+	std::shared_ptr<MagnifierCapture> mag = MagnifierCore::Instance()->FindMagnifier(GetCurrentThreadId());
+	if (mag)
+		mag->OnPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
 
-	IDirect3DSurface9 *backbuffer = nullptr;
-
-	//if (!hooked_reset)
-	//	setup_reset_hooks(device);
-
-	//present_begin(device, backbuffer);
-
-	//const HRESULT hr = m_pRealPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
-
-	//present_end(device, backbuffer);
-
-	//return hr;
-	return S_OK;
+	return MagnifierCore::Instance()->m_pRealPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
 }
 
-//static HRESULT STDMETHODCALLTYPE hook_reset(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params)
-//{
-//	if (capture_active())
-//		d3d9_free();
-//
-//	return m_pRealReset(device, params);
-//}
-//
-//static HRESULT STDMETHODCALLTYPE hook_reset_ex(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params, D3DDISPLAYMODEEX *dmex)
-//{
-//	if (capture_active())
-//		d3d9_free();
-//
-//	return m_pRealResetEx(device, params, dmex);
-//}
+HRESULT STDMETHODCALLTYPE MagnifierCore::Reset_Callback(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params)
+{
+	std::shared_ptr<MagnifierCapture> mag = MagnifierCore::Instance()->FindMagnifier(GetCurrentThreadId());
+	if (mag)
+		mag->FreeDX();
+
+	return MagnifierCore::Instance()->m_pRealReset(device, params);
+}
+
+HRESULT STDMETHODCALLTYPE MagnifierCore::ResetEx_Callback(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params, D3DDISPLAYMODEEX *dmex)
+{
+	std::shared_ptr<MagnifierCapture> mag = MagnifierCore::Instance()->FindMagnifier(GetCurrentThreadId());
+	if (mag)
+		mag->FreeDX();
+
+	return MagnifierCore::Instance()->m_pRealResetEx(device, params, dmex);
+}
 
 MagnifierCore *MagnifierCore::Instance()
 {
@@ -63,22 +59,14 @@ MagnifierCore ::~MagnifierCore()
 bool MagnifierCore::Init()
 {
 	if (m_bInited)
-		return false;
+		return true;
 
-	RegisterTestClass();
-
-	m_pRealPresentEx = (PresentEx_t)GetPresentExAddr();
-	if (!m_pRealPresentEx) {
+	if (!InitFuncAddr()) {
 		assert(false);
 		return false;
 	}
 
-	DetourTransactionBegin();
-	DetourUpdateThread(GetCurrentThread());
-	DetourAttach((PVOID *)&m_pRealPresentEx, PresentEx_Callback);
-	const LONG error = DetourTransactionCommit();
-	const bool success = (error == NO_ERROR);
-	if (!success) {
+	if (!HookFunc()) {
 		assert(false);
 		return false;
 	}
@@ -91,22 +79,15 @@ void MagnifierCore::Uninit()
 {
 	ClearMagnifier();
 
-	if (!m_bInited)
-		return;
-
-	if (m_pRealPresentEx) {
-		DetourTransactionBegin();
-		DetourUpdateThread(GetCurrentThread());
-		DetourDetach((PVOID *)&m_pRealPresentEx, PresentEx_Callback);
-		DetourTransactionCommit();
+	if (m_bInited) {
+		UnHookFunc();
+		m_bInited = false;
 	}
-
-	UnregisterClass(DX9_WINDOW_CLASS, GetModuleHandle(0));
-	m_bInited = false;
 }
 
 std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 {
+	assert(m_bInited);
 	if (!m_bInited)
 		return nullptr;
 
@@ -153,35 +134,35 @@ bool MagnifierCore ::RegisterTestClass()
 	return true;
 }
 
-void *MagnifierCore ::GetPresentExAddr()
+bool MagnifierCore ::InitFuncAddr()
 {
 	if (!m_hModule)
-		return nullptr;
+		return false;
+
+	RegisterTestClass();
 
 	HWND hWnd = 0;
-	IDirect3D9Ex *d3d9ex = nullptr;
-	IDirect3DDevice9Ex *d3d9Device = nullptr;
+	ComPtr<IDirect3D9Ex> d3d9ex;
+	ComPtr<IDirect3DDevice9Ex> d3d9DeviceEx;
 
 	RUN_WHEN_SECTION_END([=]() {
-		if (d3d9Device)
-			d3d9Device->Release();
-		if (d3d9ex)
-			d3d9ex->Release();
 		if (hWnd)
 			DestroyWindow(hWnd);
+
+		UnregisterClass(DX9_WINDOW_CLASS, GetModuleHandle(0));
 	});
 
 	hWnd = CreateWindowEx(0, DX9_WINDOW_CLASS, TEXT("d3d9 offset"), WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
 	if (!hWnd)
-		return nullptr;
+		return false;
 
 	Direct3DCreate9Ex_t create = (Direct3DCreate9Ex_t)GetProcAddress(m_hModule, "Direct3DCreate9Ex");
 	if (!create)
-		return nullptr;
+		return false;
 
-	HRESULT hr = create(D3D_SDK_VERSION, &d3d9ex);
+	HRESULT hr = create(D3D_SDK_VERSION, d3d9ex.Assign());
 	if (FAILED(hr))
-		return nullptr;
+		return false;
 
 	D3DPRESENT_PARAMETERS pp = {};
 	pp.Windowed = true;
@@ -193,12 +174,19 @@ void *MagnifierCore ::GetPresentExAddr()
 	pp.hDeviceWindow = hWnd;
 	pp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
-	hr = d3d9ex->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_NOWINDOWCHANGES, &pp, nullptr, &d3d9Device);
+	hr = d3d9ex->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_NOWINDOWCHANGES, &pp, nullptr, d3d9DeviceEx.Assign());
 	if (FAILED(hr))
-		return nullptr;
+		return false;
 
-	uintptr_t *pVirtualFuncList = *(uintptr_t **)d3d9Device;
-	return (void *)pVirtualFuncList[121]; // PresentEx
+	uintptr_t *pVirtualFuncList = *(uintptr_t **)d3d9DeviceEx.Get();
+	m_pRealPresentEx = (PresentEx_t)pVirtualFuncList[121]; // PresentEx
+
+	IDirect3DDevice9 *d3d9Device = (IDirect3DDevice9 *)d3d9DeviceEx;
+	uintptr_t *pVirtualFuncListBase = *(uintptr_t **)d3d9Device;
+	m_pRealReset = (Reset_t)pVirtualFuncListBase[16];
+	m_pRealResetEx = (ResetEx_t)pVirtualFuncListBase[132];
+
+	return true;
 }
 
 void MagnifierCore ::ClearMagnifier()
@@ -224,4 +212,35 @@ std::shared_ptr<MagnifierCapture> MagnifierCore ::FindMagnifier(DWORD tid)
 		return itr->second;
 	else
 		return nullptr;
+}
+
+bool MagnifierCore::HookFunc()
+{
+	DetourTransactionBegin();
+	DetourUpdateThread(GetCurrentThread());
+
+	DetourAttach((PVOID *)&m_pRealPresentEx, &MagnifierCore::PresentEx_Callback);
+	DetourAttach((PVOID *)&m_pRealReset, &MagnifierCore::Reset_Callback);
+	DetourAttach((PVOID *)&m_pRealResetEx, &MagnifierCore::ResetEx_Callback);
+
+	const LONG error = DetourTransactionCommit();
+	const bool success = (error == NO_ERROR);
+	return success;
+}
+
+void MagnifierCore::UnHookFunc()
+{
+	DetourTransactionBegin();
+	DetourUpdateThread(GetCurrentThread());
+
+	if (m_pRealPresentEx)
+		DetourDetach((PVOID *)&m_pRealPresentEx, &MagnifierCore::PresentEx_Callback);
+
+	if (m_pRealReset)
+		DetourAttach((PVOID *)&m_pRealReset, &MagnifierCore::Reset_Callback);
+
+	if (m_pRealResetEx)
+		DetourAttach((PVOID *)&m_pRealResetEx, &MagnifierCore::ResetEx_Callback);
+
+	DetourTransactionCommit();
 }
