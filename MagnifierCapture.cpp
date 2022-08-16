@@ -171,11 +171,7 @@ void MagnifierCapture::MagnifierThreadInner()
 bool MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
 	DWORD dwStyle = WS_POPUP | WS_CLIPCHILDREN;
-#ifdef DEBUG
-	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED;
-#else
 	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW;
-#endif
 	m_hHostWindow = CreateWindowEx(dwExStyle, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), dwStyle, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return false;
@@ -268,7 +264,7 @@ static inline HRESULT get_backbuffer(IDirect3DDevice9 *device, IDirect3DSurface9
 	}
 }
 
-bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags)
+bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device)
 {
 	assert(GetCurrentThreadId() == m_dwThreadID);
 
@@ -323,7 +319,7 @@ bool MagnifierCapture::InitTextureInfo(IDirect3DDevice9Ex *device)
 		}
 	}
 
-	return true;
+	return (m_D3DFormat == D3DFMT_A8R8G8B8); // DXGI_FORMAT_B8G8R8A8_UNORM
 }
 
 bool MagnifierCapture::CreateCopySurface(IDirect3DDevice9Ex *device)
@@ -377,6 +373,7 @@ bool MagnifierCapture::CaptureDX9()
 	if (FAILED(hr))
 		return false;
 
+	//save_as_bitmap_file("d:\\test.bmp", (uint8_t *)rect.pBits, m_nSurfacePitch, m_uWidth, m_uHeight, 4, true);
 	// TODO shmem_copy_data(i, rect.pBits);
 	m_pSurface->UnlockRect();
 

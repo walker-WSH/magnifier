@@ -32,22 +32,21 @@ protected:
 	static LRESULT __stdcall HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	static unsigned __stdcall MagnifierThread(void *pParam);
 
-	void MagnifierThreadInner();
-	bool SetupMagnifier(HINSTANCE hInst);
-	void CaptureVideo();
-
 	MagnifierCapture();
 	bool RegisterMagClass();
 
 	DWORD Start();
 	void Stop();
 
+	void MagnifierThreadInner();
+	bool SetupMagnifier(HINSTANCE hInst);
+	void CaptureVideo();
+
 	void PushTask(std::function<void()> func);
 	void RunTask();
 
-	bool OnPresentEx(IDirect3DDevice9Ex *device, CONST RECT *src_rect, CONST RECT *dst_rect, HWND override_window, CONST RGNDATA *dirty_region, DWORD flags);
+	bool OnPresentEx(IDirect3DDevice9Ex *device);
 	void FreeDX();
-
 	bool InitDX9(IDirect3DDevice9Ex *device);
 	bool CaptureDX9();
 	bool InitTextureInfo(IDirect3DDevice9Ex *device);
@@ -66,9 +65,9 @@ private:
 	HWND m_hMagChild = 0;
 
 	IDirect3DDevice9Ex *m_pDeviceEx = nullptr; /* do not release */
-	ComPtr<IDirect3DSurface9> m_pSurface;
-	D3DFORMAT m_D3DFormat;
-	UINT m_uWidth;
-	UINT m_uHeight;
+	ComPtr<IDirect3DSurface9> m_pSurface = nullptr;
+	D3DFORMAT m_D3DFormat = D3DFMT_UNKNOWN;
+	UINT m_uWidth = 0;
+	UINT m_uHeight = 0;
 	int m_nSurfacePitch = 0;
 };

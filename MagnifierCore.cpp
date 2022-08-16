@@ -14,7 +14,7 @@ HRESULT STDMETHODCALLTYPE MagnifierCore ::PresentEx_Callback(IDirect3DDevice9Ex 
 
 	std::shared_ptr<MagnifierCapture> mag = MagnifierCore::Instance()->FindMagnifier(GetCurrentThreadId());
 	if (mag)
-		mag->OnPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
+		mag->OnPresentEx(device);
 
 	return MagnifierCore::Instance()->m_pRealPresentEx(device, src_rect, dst_rect, override_window, dirty_region, flags);
 }
