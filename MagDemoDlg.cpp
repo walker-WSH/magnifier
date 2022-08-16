@@ -54,7 +54,7 @@ static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, L
 	mi.cbSize = sizeof(mi);
 	GetMonitorInfo(handle, &mi);
 
-	if (mi.dwFlags == MONITORINFOF_PRIMARY)
+	if (mi.dwFlags != MONITORINFOF_PRIMARY)
 		*rcMonitor = mi.rcMonitor; // 保存副显示器的坐标
 
 	return TRUE;
@@ -77,6 +77,9 @@ CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIA
 	cap1->SetExcludeWindow(fit);
 	cap1->SetCaptureRegion(rc);
 	cap2->SetCaptureRegion(rc);
+
+	cap1->SetFPS(30);
+	cap2->SetFPS(10);
 	
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }

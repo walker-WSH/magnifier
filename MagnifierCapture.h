@@ -10,6 +10,8 @@
 #include <assert.h>
 #include <d3d9.h>
 #include <detours.h>
+#include <queue>
+#include <atomic>
 #include "ComPtr.hpp"
 
 #define DEBUG_MAG_WINDOW 0
@@ -33,8 +35,12 @@ class MagnifierCapture : public std::enable_shared_from_this<MagnifierCapture> {
 public:
 	~MagnifierCapture();
 
+	void SetFPS(int fps);
 	void SetExcludeWindow(std::vector<HWND> filter);
 	void SetCaptureRegion(RECT rcScreen);
+
+	// Second value: bool bCaptureNormalRunning
+	std::pair<std::shared_ptr<ST_MagnifierFrame>, bool> PopVideo();
 
 protected:
 	static LRESULT __stdcall HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -61,24 +67,21 @@ protected:
 	bool InitTextureInfo(IDirect3DDevice9Ex *device);
 	bool CreateCopySurface(IDirect3DDevice9Ex *device);
 
-	void PushVideo()
-	{
-		// TODO
-	}
-	void PopVideo()
-	{
-		// TODO
-	}
+	void PushVideo(D3DLOCKED_RECT &rect);
+	void ClearVideo();
+	std::shared_ptr<uint8_t> GetIdleFrame();
 
 private:
 	std::recursive_mutex m_lockTask;
 	std::vector<std::function<void()>> m_vTaskList;
 
 	std::recursive_mutex m_lockFrame;
-	std::vector<ST_MagnifierFrame> m_vFrameList;
+	std::vector<std::shared_ptr<ST_MagnifierFrame>> m_vFrameList;
+	std::atomic<ULONGLONG> m_dwPreCaptureTime = 0;
 
 	// Accessed in magnifier thread
 	RECT m_rcCaptureScreen = {0};
+	std::queue<std::shared_ptr<uint8_t>> m_IdleList;
 
 	DWORD m_dwThreadID = 0;
 	HANDLE m_hMagThread = 0;

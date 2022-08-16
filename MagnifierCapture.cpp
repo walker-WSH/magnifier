@@ -7,13 +7,15 @@
 #define MAG_WINDOW_CLASS TEXT("MagnifierWindow")
 #define MSG_MAG_TASK WM_USER + 1
 #define MAG_TICK_TIMER_ID 1000
-#define MAG_TICK_INTERVAL 50 // in ms
+#define MAX_IDLE_FRAME_COUNT 1
+#define MAG_CAPTURE_ABORT 200 // in ms
 
 unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
 {
 	MagnifierCapture *self = reinterpret_cast<MagnifierCapture *>(pParam);
 	self->MagnifierThreadInner();
 	self->RunTask();
+	self->FreeDX();
 	return 0;
 }
 
@@ -21,11 +23,7 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 {
 	MagnifierCapture *self = (MagnifierCapture *)::GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
-	switch (message)
-	case WM_CREATE: {
-		SetTimer(hWnd, MAG_TICK_TIMER_ID, MAG_TICK_INTERVAL, NULL);
-		break;
-
+	switch (message) {
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -45,7 +43,7 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 		break;
 	}
 
-		return DefWindowProc(hWnd, message, wParam, lParam);
+	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
 MagnifierCapture::MagnifierCapture()
@@ -59,14 +57,21 @@ MagnifierCapture::~MagnifierCapture()
 	UnregisterClass(MAG_WINDOW_CLASS, GetModuleHandle(0));
 }
 
-void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
+void MagnifierCapture::SetFPS(int fps)
 {
+	assert(fps >= 10);
+
 	std::shared_ptr<MagnifierCapture> self = shared_from_this();
 	assert(self);
 	if (!self)
 		return;
 
-	PushTask([self, rcScreen]() { self->m_rcCaptureScreen = rcScreen; });
+	PushTask([self, fps]() {
+		if (IsWindow(self->m_hHostWindow)) {
+			KillTimer(self->m_hHostWindow, MAG_TICK_TIMER_ID);
+			SetTimer(self->m_hHostWindow, MAG_TICK_TIMER_ID, 1000 / fps, NULL);
+		}
+	});
 }
 
 void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
@@ -80,6 +85,33 @@ void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
 		if (!filter.empty())
 			MagSetWindowFilterList(self->m_hMagChild, MW_FILTERMODE_EXCLUDE, (int)filter.size(), (HWND *)filter.data());
 	});
+}
+
+void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
+{
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	assert(self);
+	if (!self)
+		return;
+
+	PushTask([self, rcScreen]() { self->m_rcCaptureScreen = rcScreen; });
+}
+
+std::pair<std::shared_ptr<ST_MagnifierFrame>, bool> MagnifierCapture::PopVideo()
+{
+	std::lock_guard<std::recursive_mutex> autoLock(m_lockFrame);
+
+	ULONGLONG pre = m_dwPreCaptureTime;
+	ULONGLONG crt = GetTickCount64();
+	bool timeout = (crt > pre && (crt - pre) >= MAG_CAPTURE_ABORT);
+
+	if (m_vFrameList.empty())
+		return std::make_pair(nullptr, !timeout);
+
+	auto ret = m_vFrameList.at(0);
+	m_vFrameList.erase(m_vFrameList.begin());
+
+	return std::make_pair(ret, true);
 }
 
 DWORD MagnifierCapture::Start()
@@ -224,6 +256,11 @@ void MagnifierCapture::CaptureVideo()
 
 void MagnifierCapture::PushTask(std::function<void()> func)
 {
+	if (GetCurrentThreadId() == m_dwThreadID) {
+		func();
+		return;
+	}
+
 	{
 		std::lock_guard<std::recursive_mutex> autoLock(m_lockTask);
 		m_vTaskList.push_back(func);
@@ -246,24 +283,6 @@ void MagnifierCapture::RunTask()
 		item();
 }
 
-static inline HRESULT get_backbuffer(IDirect3DDevice9 *device, IDirect3DSurface9 **surface)
-{
-	static bool use_backbuffer = false;
-	static bool checked_exceptions = false;
-
-	//if (!checked_exceptions) {
-	//	if (_strcmpi(get_process_name(), "hotd_ng.exe") == 0)
-	//		use_backbuffer = true;
-	//	checked_exceptions = true;
-	//}
-
-	if (use_backbuffer) {
-		return device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, surface);
-	} else {
-		return device->GetRenderTarget(0, surface);
-	}
-}
-
 bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device)
 {
 	assert(GetCurrentThreadId() == m_dwThreadID);
@@ -282,12 +301,15 @@ bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device)
 void MagnifierCapture::FreeDX()
 {
 	assert(GetCurrentThreadId() == m_dwThreadID);
+
 	m_pDeviceEx = nullptr;
 	m_pSurface = nullptr;
 	m_D3DFormat = D3DFMT_UNKNOWN;
 	m_uWidth = 0;
 	m_uHeight = 0;
 	m_nPitch = 0;
+
+	ClearVideo();
 }
 
 void MagnifierCapture::CheckFree(IDirect3DDevice9Ex *device)
@@ -395,9 +417,75 @@ bool MagnifierCapture::CaptureDX9()
 	if (FAILED(hr))
 		return false;
 
-	// save_as_bitmap_file("d:\\test.bmp", (uint8_t *)rect.pBits, m_nSurfacePitch, m_uWidth, m_uHeight, 4, true);
-	// TODO shmem_copy_data(i, rect.pBits);
+	PushVideo(rect);
 	m_pSurface->UnlockRect();
 
 	return true;
+}
+
+void MagnifierCapture::PushVideo(D3DLOCKED_RECT &rect)
+{
+	assert(rect.Pitch == m_nPitch);
+	assert(GetCurrentThreadId() == m_dwThreadID);
+
+	size_t size = size_t(rect.Pitch) * size_t(m_uHeight);
+	std::shared_ptr<uint8_t> data = GetIdleFrame();
+	if (!data)
+		data = std::shared_ptr<uint8_t>(new uint8_t[size]);
+
+	memmove(data.get(), rect.pBits, size);
+
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	std::weak_ptr<MagnifierCapture> wself(self);
+	std::shared_ptr<ST_MagnifierFrame> vf(new ST_MagnifierFrame(), [wself](ST_MagnifierFrame *frame) {
+		auto self = wself.lock();
+		if (self) {
+			ST_MagnifierFrame vf = *frame;
+			self->PushTask([self, vf]() {
+				if (vf.m_uWidth != self->m_uWidth || vf.m_uHeight != self->m_uHeight || vf.m_nPitch != self->m_nPitch)
+					return;
+
+				assert(GetCurrentThreadId() == self->m_dwThreadID);
+				if (self->m_IdleList.size() < MAX_IDLE_FRAME_COUNT)
+					self->m_IdleList.push(vf.m_pVideoData);
+			});
+		}
+
+		delete frame;
+	});
+
+	vf->m_uWidth = m_uWidth;
+	vf->m_uHeight = m_uHeight;
+	vf->m_nPitch = rect.Pitch;
+	vf->m_pVideoData = data;
+
+	std::lock_guard<std::recursive_mutex> autoLock(m_lockFrame);
+	m_vFrameList.clear();
+	m_vFrameList.push_back(vf);
+	m_dwPreCaptureTime = GetTickCount64();
+}
+
+void MagnifierCapture::ClearVideo()
+{
+	{
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockFrame);
+		m_vFrameList.clear();
+	}
+
+	assert(GetCurrentThreadId() == m_dwThreadID);
+	while (!m_IdleList.empty()) {
+		m_IdleList.pop();
+	}
+}
+
+std::shared_ptr<uint8_t> MagnifierCapture::GetIdleFrame()
+{
+	assert(GetCurrentThreadId() == m_dwThreadID);
+
+	if (m_IdleList.empty())
+		return nullptr;
+
+	auto ret = m_IdleList.front();
+	m_IdleList.pop();
+	return ret;
 }
