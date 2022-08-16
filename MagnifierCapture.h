@@ -20,9 +20,9 @@ using Reset_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARA
 using ResetEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *, D3DDISPLAYMODEEX *);
 
 struct ST_MagnifierFrame {
+	const D3DFORMAT m_D3DFormat = D3DFMT_A8R8G8B8;
 	UINT m_uWidth = 0;
 	UINT m_uHeight = 0;
-	D3DFORMAT m_D3DFormat = D3DFMT_A8R8G8B8;
 	INT m_nPitch = 0;
 	std::shared_ptr<uint8_t> m_pVideoData = nullptr;
 };
