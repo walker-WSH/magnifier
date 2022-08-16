@@ -101,12 +101,12 @@ std::pair<std::shared_ptr<ST_MagnifierFrame>, bool> MagnifierCapture::PopVideo()
 {
 	std::lock_guard<std::recursive_mutex> autoLock(m_lockFrame);
 
-	ULONGLONG pre = m_dwPreCaptureTime;
-	ULONGLONG crt = GetTickCount64();
-	bool timeout = (crt > pre && (crt - pre) >= MAG_CAPTURE_ABORT);
-
-	if (m_vFrameList.empty())
+	if (m_vFrameList.empty()) {
+		ULONGLONG pre = m_dwPreCaptureTime;
+		ULONGLONG crt = GetTickCount64();
+		bool timeout = (crt > pre && (crt - pre) >= MAG_CAPTURE_ABORT);
 		return std::make_pair(nullptr, !timeout);
+	}
 
 	auto ret = m_vFrameList.at(0);
 	m_vFrameList.erase(m_vFrameList.begin());

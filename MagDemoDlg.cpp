@@ -10,7 +10,6 @@
 
 #include "MagnifierCore.h"
 
-
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -61,14 +60,12 @@ static BOOL CALLBACK enum_monitor_props(HMONITOR handle, HDC hdc, LPRECT rect, L
 }
 
 std::shared_ptr<MagnifierCapture> cap1;
-std::shared_ptr<MagnifierCapture> cap2;
 
 CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIALOG, pParent)
 {
 	MagnifierCore::Instance()->Init();
 
 	cap1 = MagnifierCore::Instance()->CreateMagnifier();
-	cap2 = MagnifierCore::Instance()->CreateMagnifier();
 
 	RECT rc;
 	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)&rc);
@@ -76,11 +73,8 @@ CMagDemoDlg::CMagDemoDlg(CWnd *pParent /*=nullptr*/) : CDialogEx(IDD_MAGDEMO_DIA
 	std::vector<HWND> fit{m_hWnd};
 	cap1->SetExcludeWindow(fit);
 	cap1->SetCaptureRegion(rc);
-	cap2->SetCaptureRegion(rc);
-
 	cap1->SetFPS(30);
-	cap2->SetFPS(10);
-	
+
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
