@@ -19,6 +19,14 @@ using PresentEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9Ex *, CONST REC
 using Reset_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *);
 using ResetEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *, D3DDISPLAYMODEEX *);
 
+struct ST_MagnifierFrame {
+	UINT m_uWidth = 0;
+	UINT m_uHeight = 0;
+	D3DFORMAT m_D3DFormat = D3DFMT_A8R8G8B8;
+	INT m_nPitch = 0;
+	std::shared_ptr<uint8_t> m_pVideoData = nullptr;
+};
+
 class MagnifierCapture : public std::enable_shared_from_this<MagnifierCapture> {
 	friend class MagnifierCore;
 
@@ -47,14 +55,27 @@ protected:
 
 	bool OnPresentEx(IDirect3DDevice9Ex *device);
 	void FreeDX();
+	void CheckFree(IDirect3DDevice9Ex *device);
 	bool InitDX9(IDirect3DDevice9Ex *device);
 	bool CaptureDX9();
 	bool InitTextureInfo(IDirect3DDevice9Ex *device);
 	bool CreateCopySurface(IDirect3DDevice9Ex *device);
 
+	void PushVideo()
+	{
+		// TODO
+	}
+	void PopVideo()
+	{
+		// TODO
+	}
+
 private:
 	std::recursive_mutex m_lockTask;
 	std::vector<std::function<void()>> m_vTaskList;
+
+	std::recursive_mutex m_lockFrame;
+	std::vector<ST_MagnifierFrame> m_vFrameList;
 
 	// Accessed in magnifier thread
 	RECT m_rcCaptureScreen = {0};
@@ -69,5 +90,5 @@ private:
 	D3DFORMAT m_D3DFormat = D3DFMT_UNKNOWN;
 	UINT m_uWidth = 0;
 	UINT m_uHeight = 0;
-	INT m_nSurfacePitch = 0;
+	INT m_nPitch = 0;
 };

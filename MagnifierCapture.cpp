@@ -268,8 +268,7 @@ bool MagnifierCapture::OnPresentEx(IDirect3DDevice9Ex *device)
 {
 	assert(GetCurrentThreadId() == m_dwThreadID);
 
-	if (m_pDeviceEx != device)
-		FreeDX();
+	CheckFree(device);
 
 	if (!m_pDeviceEx)
 		InitDX9(device);
@@ -288,7 +287,30 @@ void MagnifierCapture::FreeDX()
 	m_D3DFormat = D3DFMT_UNKNOWN;
 	m_uWidth = 0;
 	m_uHeight = 0;
-	m_nSurfacePitch = 0;
+	m_nPitch = 0;
+}
+
+void MagnifierCapture::CheckFree(IDirect3DDevice9Ex *device)
+{
+	if (m_pDeviceEx != device) {
+		FreeDX();
+		return;
+	}
+
+	ComPtr<IDirect3DSurface9> bkBuffer;
+	HRESULT hr = m_pDeviceEx->GetRenderTarget(0, bkBuffer.Assign());
+	if (FAILED(hr))
+		return;
+
+	D3DSURFACE_DESC desc;
+	hr = bkBuffer->GetDesc(&desc);
+	if (FAILED(hr))
+		return;
+
+	if (desc.Format != m_D3DFormat || desc.Width != m_uWidth || desc.Height != m_uHeight) {
+		FreeDX();
+		return;
+	}
 }
 
 bool MagnifierCapture::InitTextureInfo(IDirect3DDevice9Ex *device)
@@ -333,7 +355,7 @@ bool MagnifierCapture::CreateCopySurface(IDirect3DDevice9Ex *device)
 	if (FAILED(hr))
 		return false;
 
-	m_nSurfacePitch = rect.Pitch;
+	m_nPitch = rect.Pitch;
 	m_pSurface->UnlockRect();
 
 	return true;
@@ -359,12 +381,12 @@ bool MagnifierCapture::CaptureDX9()
 {
 	assert(m_pDeviceEx);
 
-	ComPtr<IDirect3DSurface9> backbuffer;
-	HRESULT hr = m_pDeviceEx->GetRenderTarget(0, backbuffer.Assign());
+	ComPtr<IDirect3DSurface9> bkBuffer;
+	HRESULT hr = m_pDeviceEx->GetRenderTarget(0, bkBuffer.Assign());
 	if (FAILED(hr))
 		return false;
 
-	hr = m_pDeviceEx->GetRenderTargetData(backbuffer, m_pSurface);
+	hr = m_pDeviceEx->GetRenderTargetData(bkBuffer, m_pSurface);
 	if (FAILED(hr))
 		return false;
 
@@ -373,7 +395,7 @@ bool MagnifierCapture::CaptureDX9()
 	if (FAILED(hr))
 		return false;
 
-	//save_as_bitmap_file("d:\\test.bmp", (uint8_t *)rect.pBits, m_nSurfacePitch, m_uWidth, m_uHeight, 4, true);
+	// save_as_bitmap_file("d:\\test.bmp", (uint8_t *)rect.pBits, m_nSurfacePitch, m_uWidth, m_uHeight, 4, true);
 	// TODO shmem_copy_data(i, rect.pBits);
 	m_pSurface->UnlockRect();
 
