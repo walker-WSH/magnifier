@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "MagnifierCore.h"
 #include "ComPtr.hpp"
+#include "AutoRunHelper.hpp"
 
 #define DX9_WINDOW_CLASS TEXT("DX9TestClassName")
 
@@ -155,7 +156,7 @@ bool MagnifierCore ::InitFuncAddr()
 		UnregisterClass(DX9_WINDOW_CLASS, GetModuleHandle(0));
 	});
 
-	hWnd = CreateWindowEx(0, DX9_WINDOW_CLASS, TEXT("d3d9 offset"), WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
+	hWnd = CreateWindowEx(0, DX9_WINDOW_CLASS, TEXT("d3d9 offset"), WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandle(0), nullptr);
 	if (!hWnd)
 		return false;
 
