@@ -10,6 +10,45 @@
 #define MAG_TICK_TIMER 1000
 #define MAG_TICK_INTERVAL 40 // in ms
 
+unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
+{
+	MagnifierCapture *self = reinterpret_cast<MagnifierCapture *>(pParam);
+	self->MagnifierThreadInner();
+	self->RunTask();
+	return 0;
+}
+
+LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	MagnifierCapture *self = (MagnifierCapture *)::GetWindowLongPtr(hWnd, GWLP_USERDATA);
+
+	switch (message)
+	case WM_CREATE: {
+		SetTimer(hWnd, MAG_TICK_TIMER, MAG_TICK_INTERVAL, NULL);
+		break;
+
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;
+
+	case WM_TIMER:
+		if (self && wParam == MAG_TICK_TIMER) {
+			self->CaptureVideo();
+			return 0;
+		}
+		break;
+
+	case MSG_MAG_TASK:
+	default:
+		if (self)
+			self->RunTask();
+
+		break;
+	}
+
+		return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
 MagnifierCapture::MagnifierCapture()
 {
 	RegisterMagClass();
@@ -19,34 +58,6 @@ MagnifierCapture::~MagnifierCapture()
 {
 	assert(!IsWindow(m_hHostWindow));
 	UnregisterClass(MAG_WINDOW_CLASS, GetModuleHandle(0));
-}
-
-void MagnifierCapture::Start()
-{
-	assert(m_hMagThread == 0);
-	m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
-}
-
-void MagnifierCapture::Stop()
-{
-	std::shared_ptr<MagnifierCapture> self = shared_from_this();
-	assert(self);
-
-	bool bMagRunning = (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE);
-	if (!bMagRunning)
-		return;
-
-	PushTask([self, this]() {
-		if (IsWindow(m_hHostWindow))
-			DestroyWindow(m_hHostWindow);
-
-		m_hHostWindow = 0;
-		m_hMagChild = 0;
-	});
-
-	WaitForSingleObject(m_hMagThread, INFINITE);
-	CloseHandle(m_hMagThread);
-	m_hMagThread = 0;
 }
 
 void MagnifierCapture::SetCaptureRegion(RECT rcScreen)
@@ -70,6 +81,36 @@ void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
 		if (!filter.empty())
 			MagSetWindowFilterList(self->m_hMagChild, MW_FILTERMODE_EXCLUDE, (int)filter.size(), (HWND *)filter.data());
 	});
+}
+
+void MagnifierCapture::Start()
+{
+	bool bMagRunning = (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE);
+	assert(!bMagRunning);
+	if (!bMagRunning)
+		m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
+}
+
+void MagnifierCapture::Stop()
+{
+	std::shared_ptr<MagnifierCapture> self = shared_from_this();
+	assert(self);
+
+	bool bMagRunning = (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE);
+	if (!bMagRunning)
+		return;
+
+	PushTask([self, this]() {
+		if (IsWindow(m_hHostWindow))
+			DestroyWindow(m_hHostWindow);
+
+		m_hHostWindow = 0;
+		m_hMagChild = 0;
+	});
+
+	WaitForSingleObject(m_hMagThread, INFINITE);
+	CloseHandle(m_hMagThread);
+	m_hMagThread = 0;
 }
 
 bool MagnifierCapture::RegisterMagClass()
@@ -192,43 +233,4 @@ void MagnifierCapture::RunTask()
 
 	for (auto &item : tasks)
 		item();
-}
-
-unsigned __stdcall MagnifierCapture::MagnifierThread(void *pParam)
-{
-	MagnifierCapture *self = reinterpret_cast<MagnifierCapture *>(pParam);
-	self->MagnifierThreadInner();
-	self->RunTask();
-	return 0;
-}
-
-LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	MagnifierCapture *self = (MagnifierCapture *)::GetWindowLongPtr(hWnd, GWLP_USERDATA);
-
-	switch (message)
-	case WM_CREATE: {
-		SetTimer(hWnd, MAG_TICK_TIMER, MAG_TICK_INTERVAL, NULL);
-		break;
-
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-
-	case WM_TIMER:
-		if (self && wParam == MAG_TICK_TIMER) {
-			self->CaptureVideo();
-			return 0;
-		}
-		break;
-
-	case MSG_MAG_TASK:
-	default:
-		if (self)
-			self->RunTask();
-
-		break;
-	}
-
-		return DefWindowProc(hWnd, message, wParam, lParam);
 }

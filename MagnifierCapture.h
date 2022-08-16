@@ -17,9 +17,6 @@ class MagnifierCapture : public std::enable_shared_from_this<MagnifierCapture> {
 public:
 	~MagnifierCapture();
 
-	void Start();
-	void Stop();
-
 	void SetExcludeWindow(std::vector<HWND> filter);
 	void SetCaptureRegion(RECT rcScreen);
 
@@ -28,6 +25,9 @@ protected:
 	static unsigned __stdcall MagnifierThread(void *pParam);
 	
 	MagnifierCapture();
+
+	void Start();
+	void Stop();
 
 	bool RegisterMagClass();
 	void MagnifierThreadInner();

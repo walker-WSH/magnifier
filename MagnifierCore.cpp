@@ -110,6 +110,7 @@ void MagnifierCore::Uninit()
 std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 {
 	auto ret = std::shared_ptr<MagnifierCapture>(new MagnifierCapture());
+	ret->Start();
 
 	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
 	m_vMagList.push_back(ret);
@@ -117,18 +118,22 @@ std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 	return ret;
 }
 
-void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> ptr)
+void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> &ptr)
 {
-	ptr->Stop();
+	{
+		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
 
-	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
-	auto itr = m_vMagList.begin();
-	while (itr != m_vMagList.end()) {
-		if (itr->get() == ptr.get()) {
-			m_vMagList.erase(itr);
-			return;
+		auto itr = m_vMagList.begin();
+		while (itr != m_vMagList.end()) {
+			if (itr->get() == ptr.get()) {
+				m_vMagList.erase(itr);
+				return;
+			}
 		}
 	}
+
+	ptr->Stop();
+	ptr = nullptr;
 }
 
 bool MagnifierCore ::RegisterTestClass()
