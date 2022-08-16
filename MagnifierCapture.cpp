@@ -442,22 +442,22 @@ void MagnifierCapture::PushVideo(D3DLOCKED_RECT &rect)
 		if (self) {
 			ST_MagnifierFrame vf = *frame;
 			self->PushTask([self, vf]() {
-				if (vf.m_uWidth != self->m_uWidth || vf.m_uHeight != self->m_uHeight || vf.m_nPitch != self->m_nPitch)
+				if (vf.width != self->m_uWidth || vf.height != self->m_uHeight || vf.pitch != self->m_nPitch)
 					return;
 
 				assert(GetCurrentThreadId() == self->m_dwThreadID);
 				if (self->m_IdleList.size() < MAX_IDLE_FRAME_COUNT)
-					self->m_IdleList.push(vf.m_pVideoData);
+					self->m_IdleList.push(vf.data);
 			});
 		}
 
 		delete frame;
 	});
 
-	vf->m_uWidth = m_uWidth;
-	vf->m_uHeight = m_uHeight;
-	vf->m_nPitch = rect.Pitch;
-	vf->m_pVideoData = data;
+	vf->width = m_uWidth;
+	vf->height = m_uHeight;
+	vf->pitch = rect.Pitch;
+	vf->data = data;
 
 	std::lock_guard<std::recursive_mutex> autoLock(m_lockFrame);
 	m_vFrameList.clear();
