@@ -103,6 +103,9 @@ std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 
 void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> &ptr)
 {
+	if (!ptr)
+		return;
+
 	{
 		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
 
