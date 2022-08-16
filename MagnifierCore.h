@@ -1,5 +1,6 @@
 #pragma once
 #include "MagnifierCapture.h"
+#include <map>
 #include <d3d9.h>
 
 class CAutoRunWhenSecEnd {
@@ -38,6 +39,9 @@ protected:
 	bool RegisterTestClass();
 	void *GetPresentExAddr();
 
+	void ClearMagnifier();
+	std::shared_ptr<MagnifierCapture> FindMagnifier(DWORD tid);
+
 private:
 	bool m_bInited = false;
 
@@ -47,5 +51,5 @@ private:
 	ResetEx_t m_pRealResetEx = nullptr;
 
 	std::recursive_mutex m_lockList;
-	std::vector<std::shared_ptr<MagnifierCapture>> m_vMagList; // need to free
+	std::map<DWORD, std::shared_ptr<MagnifierCapture>> m_mapMagList; // need to free
 };

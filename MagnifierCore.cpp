@@ -55,8 +55,7 @@ MagnifierCore ::MagnifierCore()
 
 MagnifierCore ::~MagnifierCore()
 {
-	assert(m_vMagList.empty());
-	m_vMagList.clear();
+	ClearMagnifier();
 	if (m_hModule)
 		FreeLibrary(m_hModule);
 }
@@ -90,8 +89,7 @@ bool MagnifierCore::Init()
 
 void MagnifierCore::Uninit()
 {
-	assert(m_vMagList.empty());
-	m_vMagList.clear();
+	ClearMagnifier();
 
 	if (!m_bInited)
 		return;
@@ -109,11 +107,15 @@ void MagnifierCore::Uninit()
 
 std::shared_ptr<MagnifierCapture> MagnifierCore::CreateMagnifier()
 {
+	if (!m_bInited)
+		return nullptr;
+
 	auto ret = std::shared_ptr<MagnifierCapture>(new MagnifierCapture());
-	ret->Start();
+	DWORD tid = ret->Start();
 
 	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
-	m_vMagList.push_back(ret);
+	assert(m_mapMagList[tid] == nullptr);
+	m_mapMagList[tid] = ret;
 
 	return ret;
 }
@@ -123,13 +125,10 @@ void MagnifierCore::DestroyMagnifier(std::shared_ptr<MagnifierCapture> &ptr)
 	{
 		std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
 
-		auto itr = m_vMagList.begin();
-		while (itr != m_vMagList.end()) {
-			if (itr->get() == ptr.get()) {
-				m_vMagList.erase(itr);
-				return;
-			}
-		}
+		auto itr = m_mapMagList.find(ptr->m_dwThreadID);
+		assert(itr != m_mapMagList.end());
+		if (itr != m_mapMagList.end())
+			m_mapMagList.erase(itr);
 	}
 
 	ptr->Stop();
@@ -200,4 +199,29 @@ void *MagnifierCore ::GetPresentExAddr()
 
 	uintptr_t *pVirtualFuncList = *(uintptr_t **)d3d9Device;
 	return (void *)pVirtualFuncList[121]; // PresentEx
+}
+
+void MagnifierCore ::ClearMagnifier()
+{
+	assert(m_mapMagList.empty());
+
+	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+
+	for (auto &item : m_mapMagList) {
+		item.second->Stop();
+		item.second = nullptr;
+	}
+
+	m_mapMagList.clear();
+}
+
+std::shared_ptr<MagnifierCapture> MagnifierCore ::FindMagnifier(DWORD tid)
+{
+	std::lock_guard<std::recursive_mutex> autoLock(m_lockList);
+
+	auto itr = m_mapMagList.find(tid);
+	if (itr != m_mapMagList.end())
+		return itr->second;
+	else
+		return nullptr;
 }

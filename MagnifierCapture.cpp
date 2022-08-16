@@ -83,12 +83,22 @@ void MagnifierCapture::SetExcludeWindow(std::vector<HWND> filter)
 	});
 }
 
-void MagnifierCapture::Start()
+DWORD MagnifierCapture::Start()
 {
-	bool bMagRunning = (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE);
-	assert(!bMagRunning);
-	if (!bMagRunning)
-		m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
+	if (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE) {
+		assert(false);
+		return 0;
+	}
+
+	m_hMagThread = (HANDLE)_beginthreadex(0, 0, MagnifierThread, this, 0, 0);
+
+	if (m_hMagThread && m_hMagThread != INVALID_HANDLE_VALUE) {
+		m_dwThreadID = GetThreadId(m_hMagThread);
+		return m_dwThreadID;
+	} else {
+		assert(false);
+		return 0;
+	}
 }
 
 void MagnifierCapture::Stop()

@@ -26,7 +26,7 @@ protected:
 	
 	MagnifierCapture();
 
-	void Start();
+	DWORD Start();
 	void Stop();
 
 	bool RegisterMagClass();
@@ -43,6 +43,7 @@ private:
 	// Accessed in magnifier thread
 	RECT m_rcCaptureScreen = {0};
 
+	DWORD m_dwThreadID = 0;
 	HANDLE m_hMagThread = 0;
 	HWND m_hHostWindow = 0;
 	HWND m_hMagChild = 0;
