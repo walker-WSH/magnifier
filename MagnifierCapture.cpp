@@ -203,7 +203,12 @@ void MagnifierCapture::MagnifierThreadInner()
 bool MagnifierCapture::SetupMagnifier(HINSTANCE hInst)
 {
 	DWORD dwStyle = WS_POPUP | WS_CLIPCHILDREN;
+#ifdef DEBUG
+	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED;
+#else
 	DWORD dwExStyle = WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW;
+#endif // DEBUG
+
 	m_hHostWindow = CreateWindowEx(dwExStyle, MAG_WINDOW_CLASS, TEXT("NAVER Magnifier"), dwStyle, 0, 0, 0, 0, NULL, NULL, hInst, NULL);
 	if (!m_hHostWindow)
 		return false;
