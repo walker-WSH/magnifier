@@ -36,10 +36,13 @@ LRESULT __stdcall MagnifierCapture::HostWndProc(HWND hWnd, UINT message, WPARAM 
 		break;
 
 	case MSG_MAG_TASK:
-	default:
-		if (self)
+		if (self) {
 			self->RunTask();
+			return 0;
+		}
+		break;
 
+	default:
 		break;
 	}
 
