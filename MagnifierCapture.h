@@ -21,6 +21,12 @@ using PresentEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9Ex *, CONST REC
 using Reset_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *);
 using ResetEx_t = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *, D3DDISPLAYMODEEX *);
 
+/*
+问题：
+有时候设置的屏幕区域 一直捕获不了画面  callback也没有进入
+比如(0, 0, 1920, 1080),  但是修改为1921，1919， 1084， 就可以捕获画面了。原因不明
+*/
+
 struct ST_MagnifierFrame {
 	const D3DFORMAT format = D3DFMT_A8R8G8B8;
 	UINT width = 0;
